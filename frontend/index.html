@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS</title>
+<style>
+  :root {
+    --bg: #020407;
+    --panel: rgba(8, 20, 34, 0.86);
+    --border: rgba(0, 200, 255, 0.25);
+    --accent: #00c8ff;
+    --accent-warm: #ffb627;
+    --danger: #ff5b5b;
+    --text: #d6e7f4;
+    --muted: #5a738a;
+    --ok: #5effa0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(0,200,255,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 100%, rgba(255,182,39,0.06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: "SF Mono", "JetBrains Mono", "Roboto Mono", ui-monospace, monospace;
+    overflow: hidden;
+  }
+  /* faint scanline */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  }
+  .frame { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+
+  /* --- Header --- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,40,70,0.5), transparent);
+  }
+  .brand { letter-spacing: 6px; font-weight: 700; color: var(--accent); font-size: 14px; }
+  .brand .sub { color: var(--muted); letter-spacing: 2px; font-size: 10px; margin-left: 12px; }
+
+  .indicators { display: flex; gap: 22px; align-items: center; font-size: 11px; color: var(--muted); }
+  .ind { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 6px var(--muted); }
+  .dot.idle    { background: var(--muted); box-shadow: 0 0 6px var(--muted); }
+  .dot.listen  { background: var(--accent-warm); box-shadow: 0 0 10px var(--accent-warm); animation: pulse 1s infinite; }
+  .dot.think   { background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pulse 0.6s infinite; }
+  .dot.speaking { background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: pulse 0.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .provider { color: var(--accent); letter-spacing: 1px; }
+
+  /* --- Body: chat + side panel --- */
+  .body { display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+  .chat {
+    display: flex; flex-direction: column; min-height: 0;
+    padding: 18px 22px 14px; gap: 12px; overflow-y: auto;
+  }
+  .chat::-webkit-scrollbar { width: 8px; }
+  .chat::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.18); border-radius: 4px; }
+
+  .msg { max-width: 86%; padding: 10px 14px; border-radius: 8px; line-height: 1.55; font-size: 14px; }
+  .msg .meta { font-size: 10px; color: var(--muted); margin-bottom: 5px; letter-spacing: 1px;
+               display: flex; gap: 10px; }
+  .msg.user {
+    align-self: flex-end; text-align: left; color: #fff;
+    background: linear-gradient(135deg, rgba(0,140,200,0.22), rgba(0,90,160,0.30));
+    border: 1px solid rgba(0,200,255,0.30);
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .msg.assistant .meta .p { color: var(--accent); }
+  .msg .content { white-space: pre-wrap; word-wrap: break-word; }
+  .tool { font-size: 11px; color: var(--accent); border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px; }
+  .tool.muted { color: var(--muted); opacity: 0.6; }
+
+  /* --- Side panel --- */
+  aside {
+    border-left: 1px solid var(--border); padding: 16px;
+    background: linear-gradient(180deg, rgba(0,30,55,0.45), transparent);
+    font-size: 11px; color: var(--muted);
+    overflow-y: auto;
+  }
+  aside h3 { color: var(--accent); letter-spacing: 3px; font-size: 10px; margin: 0 0 12px; font-weight: 600; }
+  .gauge { margin: 12px 0; }
+  .gauge .lbl { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .gauge .bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .gauge .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-warm)); width: 0%; transition: width 0.4s; }
+  .gauge.dim .fill { background: var(--muted); opacity: 0.4; }
+  .gauge.dim .lbl { color: var(--muted); opacity: 0.55; }
+  .gauge .note { color: var(--muted); font-size: 9px; margin-top: 3px; opacity: 0.6; }
+
+  .alert {
+    margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 11px;
+    border: 1px solid var(--border); background: rgba(0,40,70,0.4); color: var(--text);
+  }
+  .alert.danger { border-color: var(--danger); background: rgba(70,0,0,0.4); color: #ffd0d0; }
+
+  /* --- Composer --- */
+  footer { border-top: 1px solid var(--border); padding: 10px 22px 14px; background: rgba(0,10,20,0.6); }
+  .composer { display: flex; gap: 10px; align-items: center; }
+  .composer textarea {
+    flex: 1; resize: none; height: 44px; padding: 12px 14px;
+    background: rgba(0,20,40,0.6); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; outline: none;
+    font-family: inherit; font-size: 14px;
+    box-shadow: inset 0 0 12px rgba(0,200,255,0.06);
+  }
+  .composer textarea:focus { border-color: var(--accent); }
+  .composer textarea::placeholder { color: var(--muted); }
+  .hint { color: var(--muted); font-size: 10px; letter-spacing: 1px; margin-top: 8px; }
+  .hint kbd { background: rgba(0,200,255,0.08); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; }
+  /* Per spec: no buttons for JARVIS actions. Enter sends. */
+  .auth {
+    position: fixed; inset: 0; background: rgba(0,4,8,0.92); z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .auth-card {
+    width: 360px; padding: 22px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel); text-align: center;
+  }
+  .auth-card h2 { color: var(--accent); letter-spacing: 4px; margin: 0 0 6px; font-size: 14px; }
+  .auth-card p { color: var(--muted); font-size: 11px; line-height: 1.6; margin: 8px 0 16px; }
+  .auth-card input {
+    width: 100%; padding: 10px; background: rgba(0,20,40,0.6); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-family: inherit; outline: none;
+  }
+  .auth-card input:focus { border-color: var(--accent); }
+  .auth-card .err { color: var(--danger); font-size: 11px; margin-top: 10px; }
+  .auth-note { color: var(--muted); font-size: 10px; margin: 14px 0 0; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <header>
+    <div class="brand">J.A.R.V.I.S.<span class="sub">Just A Rather Very Intelligent System</span></div>
+    <div class="indicators">
+      <div class="ind"><span id="stateDot" class="dot idle"></span><span id="stateLabel">IDLE</span></div>
+      <div class="ind">Provider: <span id="provider" class="provider">—</span></div>
+    </div>
+  </header>
+
+  <div class="body">
+    <section class="chat" id="chat"></section>
+
+    <aside>
+      <h3>SYSTEM</h3>
+      <div class="gauge dim"><div class="lbl"><span>CPU</span><span id="cpuVal">—</span></div><div class="bar"><div class="fill" id="cpuBar"></div></div><div class="note">live in a later step</div></div>
+      <div class="gauge dim"><div class="lbl"><span>RAM</span><span id="ramVal">—</span></div><div class="bar"><div class="fill" id="ramBar"></div></div><div class="note">live in a later step</div></div>
+      <div class="gauge dim"><div class="lbl"><span>GPU °C</span><span id="gpuVal">—</span></div><div class="bar"><div class="fill" id="gpuBar"></div></div><div class="note">live in a later step</div></div>
+      <div class="gauge dim"><div class="lbl"><span>VRAM</span><span id="vramVal">—</span></div><div class="bar"><div class="fill" id="vramBar"></div></div><div class="note">live in a later step</div></div>
+
+      <h3 style="margin-top: 22px;">PRIVACY</h3>
+      <div class="alert" id="privacyAlert">
+        Security layer armed in a later build step.<br>
+        <span style="color: var(--muted);">Step 1 = chat baseline.</span>
+      </div>
+
+      <h3 style="margin-top: 22px;">FILES</h3>
+      <div id="files" style="color: var(--muted); opacity: 0.6;">—</div>
+    </aside>
+  </div>
+
+  <footer>
+    <div class="composer">
+      <textarea id="input" placeholder="What can I do for you, Sir?" autofocus
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}"></textarea>
+    </div>
+    <div class="hint"><kbd>Enter</kbd> send · <kbd>Shift+Enter</kbd> newline — one input, JARVIS decides what to do.</div>
+  </footer>
+</div>
+
+<div class="auth" id="auth" style="display:none;">
+  <div class="auth-card">
+    <h2>J.A.R.V.I.S.</h2>
+    <p id="authStatus">Authenticating…</p>
+    <input id="tokenInput" type="password" placeholder="paste token" style="display:none;"
+      onkeydown="if(event.key==='Enter')doAuth();">
+    <div class="err" id="authErr"></div>
+    <p class="auth-note" id="authNote" style="display:none;">Token discovery failed — you are
+      likely opening this from another device. Paste the token from <code>.jarvis_token</code>
+      on the host machine.</p>
+  </div>
+</div>
+
+<script>
+  // Boot: try to discover the token silently from the same machine.
+  // If that fails (remote phone, or wrong host), expose the manual paste card.
+  async function bootstrapAuth() {
+    const card = document.getElementById("auth");
+    let token = null;
+    try {
+      const r = await fetch("/api/token", { headers: { "accept": "text/plain" } });
+      if (r.ok) token = (await r.text()).trim();
+    } catch (e) { /* network down — fall through to manual */ }
+    if (token) {
+      card.style.display = "none";
+      connect(token);
+    } else {
+      document.getElementById("authStatus").textContent =
+        "I couldn't authenticate automatically, Sir.";
+      document.getElementById("tokenInput").style.display = "block";
+      document.getElementById("authNote").style.display = "block";
+      card.style.display = "flex";
+      document.getElementById("tokenInput").focus();
+    }
+  }
+  document.addEventListener("DOMContentLoaded", bootstrapAuth);
+
+  function setState(p) {
+    phase = p; const dot = document.getElementById("stateDot"), lbl = document.getElementById("stateLabel");
+    dot.className = "dot " + p;
+    lbl.textContent = p.toUpperCase();
+  }
+  setState("idle");
+
+  addChat("assistant", "Systems online, Sir. At your service.\nVoice, memory, and the rest arrive in their proper steps — for now, talk to me. Type below.", "JARVIS", "boilerplate");
+
+  function addChat(role, content, provider, model) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + (role === "user" ? "user" : "assistant");
+    const last = (window.__lastRole || "");
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.innerHTML = `<span>${role.toUpperCase()}</span>` +
+      (role === "assistant" && provider ? `<span class="p">${provider} · ${model}</span>` : "") +
+      `<span>${new Date().toLocaleTimeString()}</span>`;
+    const body = document.createElement("div"); body.className = "content"; body.textContent = content;
+    wrap.appendChild(meta); wrap.appendChild(body);
+    if (role === "assistant") {
+      const t = document.createElement("div"); t.className = "tool muted";
+      t.textContent = "Tool execution: enabled in a later step";
+      wrap.appendChild(t);
+    }
+    const chat = document.getElementById("chat");
+    chat.appendChild(wrap); chat.scrollTop = chat.scrollHeight;
+  }
+
+  function send() {
+    const el = document.getElementById("input");
+    const text = el.value.trim();
+    if (!text || !ws || ws.readyState !== 1) return;
+    el.value = "";
+    addChat("user", text, null, null);
+    setState("thinking");
+    ws.send(JSON.stringify({type: "chat", text}));
+  }
+
+  function connect(token) {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onopen = () => ws.send(JSON.stringify({token}));
+    ws.onmessage = (ev) => {
+      const f = JSON.parse(ev.data);
+      if (f.type === "auth") {
+        if (f.ok) { document.getElementById("auth").style.display = "none"; }
+        else document.getElementById("authErr").textContent = "Token rejected.";
+        return;
+      }
+      if (f.type === "message") {
+        addChat(f.role, f.content, f.provider, f.model);
+        if (f.provider) document.getElementById("provider").textContent = f.provider;
+      }
+      if (f.type === "state") setState(f.phase);
+      if (f.type === "error") addChat("assistant", "(error) " + (f.reason || "unknown"), "error", "-");
+    };
+    ws.onclose = () => { setState("idle"); setTimeout(() => connect(token), 1500); };
+  }
+
+  async function doAuth() {
+    const tok = document.getElementById("tokenInput").value.trim();
+    document.getElementById("authErr").textContent = "";
+    try { connect(tok); } catch (e) {
+      document.getElementById("authErr").textContent = "Connection failed.";
+    }
+  }
+</script>
+</body>
+</html>

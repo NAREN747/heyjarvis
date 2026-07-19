@@ -1,0 +1,1 @@
+import json\n\nclass QuestionCounter:\n    def __init__(self):\n        self.questions = 0\n\n    def ask_question(self):\n        self.questions += 1\n        return f\"You have asked {self.questions} questions so far.\"\n\n    def get_question_count(self):\n        return self.questions

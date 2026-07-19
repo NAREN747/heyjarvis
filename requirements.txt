@@ -1,0 +1,13 @@
+# JARVIS Step 1: Server + Chat
+# Minimal dependency set, expanded per spec as steps advance.
+fastapi==0.118.0
+uvicorn[standard]==0.35.0
+httpx==0.28.1
+websockets==15.0
+python-multipart==0.0.20
+
+# YouTube API
+google-api-python-client==2.140.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-auth==2.36.0

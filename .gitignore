@@ -1,0 +1,40 @@
+# Build / runtime artefacts
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Secrets — never commit
+.jarvis_token
+*.key
+.env
+client_secrets.json
+youtube_token.json
+
+# Self-modification snapshots
+jarvis_snapshots/
+
+# Local data stores (created at runtime)
+vault/
+*.db
+identity.json
+
+# Voice models cache
+whisper_models/
+openwakeword_models/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/opencode/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
